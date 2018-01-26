@@ -13,7 +13,8 @@ xgb_n_trees = 300
 #Please set following path accordingly
 
 #where we can find training, test, and sampleSubmission.csv
-raw_data_path = '/home/fast/2014_mobilectr/'
+#raw_data_path = '/home/fast/2014_mobilectr/'
+raw_data_path = '/Users/jiangwei/Workspace/kaggle-avazu/dataset_simple/'
 #where we store results -- require about 130GB
 tmp_data_path = './tmp_data/'
 

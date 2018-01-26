@@ -3,10 +3,10 @@ import numpy as np
 import scipy as sc
 import scipy.sparse as sp
 from sklearn.utils import check_random_state 
-import pylab 
+#import pylab 
 import sys
 import time
-sys.path.append('/home/zzhang/Downloads/xgboost/wrapper')
+#sys.path.append('/home/zzhang/Downloads/xgboost/wrapper')
 import xgboost as xgb
 from joblib import dump, load, Parallel, delayed
 import utils
@@ -17,9 +17,12 @@ raw_data_path = utils.raw_data_path
 tmp_data_path = utils.tmp_data_path
 
 
-t0org0 = pd.read_csv(open(raw_data_path + "train", "ra"))
-h0org = pd.read_csv(open(raw_data_path + "test", "ra"))
+t0org0 = pd.read_csv(open(raw_data_path + "train.csv", "ra"))
+h0org = pd.read_csv(open(raw_data_path + "test.csv", "ra"))
 
+print type(t0org0),t0org0.shape
+print type(h0org),h0org.shape
+sys.exit(-1)
 
 if utils.sample_pct < 1.0:
     np.random.seed(999)
