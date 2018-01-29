@@ -1,4 +1,3 @@
-#-*- coding:utf-8 -*-
 import numpy as np
 import pandas as pd
 from sklearn.utils import check_random_state 
@@ -61,14 +60,8 @@ def get_agg(group_by, value, func):
 def calcLeaveOneOut2(df, vn, vn_y, cred_k, r_k, power, mean0=None, add_count=False):
     if mean0 is None:
         mean0 = df_yt[vn_y].mean() * np.ones(df.shape[0])
-    print "-"*30,type(df[vn].values)
-    #_key_codes 是编码后的值
     _key_codes = df[vn].values.codes
-    print "-"*30,"df[vn].values",df[vn].values
-    print "-"*30,"_key_codes",_key_codes
-    #按照_key_codes(type : np.array ,for exaple [0,1,0])进行groupby
     grp1 = df[vn_y].groupby(_key_codes)
-    #grp_mean也是
     grp_mean = pd.Series(mean0).groupby(_key_codes)
     mean1 = grp_mean.aggregate(np.mean)
     sum1 = grp1.aggregate(np.sum)
@@ -78,19 +71,6 @@ def calcLeaveOneOut2(df, vn, vn_y, cred_k, r_k, power, mean0=None, add_count=Fal
     #print cnt1
     vn_sum = 'sum_' + vn
     vn_cnt = 'cnt_' + vn
-    #>>> _key_codes = np.array([0,0,1])
-    #>>> A
-    #   e
-    #0  a
-    #1  a
-    #2  b
-    #>>> g = A['e'].groupby(_key_codes)
-    #>>> s = g.aggregate(np.sum)
-    #>>> s
-    #0    aa
-    #1     b
-    #>>>s[_key_codes].values
-    #array(['aa', 'aa', 'b'], dtype=object) 
     _sum = sum1[_key_codes].values
     _cnt = cnt1[_key_codes].values
     _mean = mean1[_key_codes].values
@@ -208,58 +188,28 @@ def mergeLeaveOneOut2(df, dfv, vn):
     
 def calcTVTransform(df, vn, vn_y, cred_k, filter_train, mean0=None):
     if mean0 is None:
-        #计算过滤后的mean,一般都是目标值(y),这里一般是'click'
         mean0 = df.ix[filter_train, vn_y].mean()
         print "mean0:", mean0
     else:
         mean0 = mean0[~filter_train]
-    #category feature encodeing 
-    #    for example ["t1","t2","t3"] -> [0,1,2] 
-    #    vn 比如 "app_or_web"
+        
     df['_key1'] = df[vn].astype('category').values.codes
-    #取符合条件的两列 这里的条件一般是除去最后一天(目标天)
     df_yt = df.ix[filter_train, ['_key1', vn_y]]
-    v_codes = df.ix[~filter_train, '_key1']
-    print "-"*30,filter_train
-    print "-"*30,df_yt
-    print "-"*30,v_codes
     #df_y.set_index([')key1'])
-    #根据_key1进行聚合(_key1: for app_or_web)
     grp1 = df_yt.groupby(['_key1'])
-    #对每个聚合元素(for example app_or_web 中对vn_y("click")值进行统计。)
     sum1 = grp1[vn_y].aggregate(np.sum)
     cnt1 = grp1[vn_y].aggregate(np.size)
     vn_sum = 'sum_' + vn
     vn_cnt = 'cnt_' + vn
-    print "--" * 30,"df_yt"
-    print df_yt
-    print "--" * 30,"grp1"
-    print grp1
-    print "--" * 30,"sum1"
-    print sum1
-    print "--" * 30,"cnt1"
-    print cnt1
-    #print "~filter_train",~filter_train type np.array([False,False])
-    # ~ 取反
-    #取 目标天的 _key1 ( web_or_app )
     v_codes = df.ix[~filter_train, '_key1']
-    print "--" * 30,"v_codes"
-    print v_codes
-    # sum1 相当与字典{"A":1,"B":2}
-    # v_codes 相当于 ["A","A","B","A","B"]
-    # _sum 相当于 [1,1,2,1,2]，这一步是做映射
     _sum = sum1[v_codes].values
-    print "type v_codes",type(v_codes),"type sum1",type(sum1),"type _sum",type(_sum)
-    print "--" * 30,"_sum"
-    print "_sum",_sum
     _cnt = cnt1[v_codes].values
     _cnt[np.isnan(_sum)] = 0    
     _sum[np.isnan(_sum)] = 0
- 
+    
     r = {}
     r['exp'] = (_sum + cred_k * mean0)/(_cnt + cred_k)
     r['cnt'] = _cnt
-    #print "r",r
     return r
 
 def cntDualKey(df, vn, vn2, key_src, key_tgt, fill_na=False):
@@ -519,14 +469,11 @@ def calc_exptv(t0, vn_list, last_day_only=False, add_count=False):
             day1 = 20
             if last_day_only:
                 day1 = day_v - 2
-            # logical_and rtype ,for example [False,True,True].
-            # 这个是截取了一个时间区间(day1,day_v](如果last_day_only is True,day1是随day_v变化的，不然是不变的)
             filter_t = np.logical_and(t0.day.values > day1, t0.day.values <= day_v)
             vn_key = vn
             t1 = t0a.ix[filter_t, :].copy()
-            # 另一个过滤器,排除day_v(当前计算时刻) 即(day1,day_v)
             filter_t2 = np.logical_and(t1.day.values != day_v, t1.day.values < 31)
-            #
+            
             if vn == 'app_or_web':
                 day_exps[day_v][vn_key] = calcTVTransform(t1, vn, 'click', cred_k, filter_t2)
             else:

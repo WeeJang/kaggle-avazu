@@ -1,3 +1,4 @@
+#-*- coding:utf-8 -*-
 import pandas as pd
 import numpy as np
 import scipy as sc
@@ -7,11 +8,14 @@ from sklearn.utils import check_random_state
 import sys
 import time
 #sys.path.append('/home/zzhang/Downloads/xgboost/wrapper')
-import xgboost as xgb
+#import xgboost as xgb
 from joblib import dump, load, Parallel, delayed
 import utils
 from utils import *
 
+import logging
+logging.basicConfig(level="ERROR")
+logging.error("hello")
 
 raw_data_path = utils.raw_data_path
 tmp_data_path = utils.tmp_data_path
@@ -20,32 +24,41 @@ tmp_data_path = utils.tmp_data_path
 t0org0 = pd.read_csv(open(raw_data_path + "train.csv", "ra"))
 h0org = pd.read_csv(open(raw_data_path + "test.csv", "ra"))
 
-print type(t0org0),t0org0.shape
-print type(h0org),h0org.shape
-sys.exit(-1)
 
-if utils.sample_pct < 1.0:
+#if utils.sample_pct < 1.0:
+if False:
     np.random.seed(999)
     r1 = np.random.uniform(0, 1, t0org0.shape[0])
+    logging.error("t0org0:{}".format(t0org0.shape))
     t0org0 = t0org0.ix[r1 < utils.sample_pct, :]
+    logging.error("t0org0:{}".format(t0org0.shape))
     print "testing with small sample of training data, ", t0org0.shape
 
 
+#测试集补上'click'字段
 h0org['click'] = 0
+#t0org0(随机抽样后) h0org 连接起来(垂直方向,纬度不变，数据集增大)
 t0org = pd.concat([t0org0, h0org])
 print "finished loading raw data, ", t0org.shape
 
+logging.error("t0org.hour : {}".format(t0org.hour))
 print "to add some basic features ..."
 t0org['day']=np.round(t0org.hour % 10000 / 100)
+print t0org['day']
 t0org['hour1'] = np.round(t0org.hour % 100)
+#这个是从0天开始，到现在经过的时间hour
 t0org['day_hour'] = (t0org.day.values - 21) * 24 + t0org.hour1.values
+#trick????
 t0org['day_hour_prev'] = t0org['day_hour'] - 1
 t0org['day_hour_next'] = t0org['day_hour'] + 1
 t0org['app_or_web'] = 0
+# 把'app_id'=='ecad2386'的样本的'app_or_web'的值设置为1
 t0org.ix[t0org.app_id.values=='ecad2386', 'app_or_web'] = 1
 
+#重命名一下
 t0 = t0org
 
+#把app_id 与 site_id 拼接在一块(节省空间)
 t0['app_site_id'] = np.add(t0.app_id.values, t0.site_id.values)
 
 print "to encode categorical features using mean responses from earlier days -- univariate"
@@ -53,12 +66,16 @@ sys.stdout.flush()
 
 calc_exptv(t0,  ['app_or_web'])
 
+print "exit"
+print t0
+#sys.exit(-1)
+
 exptv_vn_list = ['app_site_id', 'as_domain', 'C14','C17', 'C21', 'device_model', 'device_ip', 'device_id', 'dev_ip_aw', 
                 'app_site_model', 'site_model','app_model', 'dev_id_ip', 'C14_aw', 'C17_aw', 'C21_aw']
 
-calc_exptv(t0, exptv_vn_list)
+#calc_exptv(t0, exptv_vn_list)
 
-calc_exptv(t0, ['app_site_id'], add_count=True)
+#calc_exptv(t0, ['app_site_id'], add_count=True)
 
 
 print "to encode categorical features using mean responses from earlier days -- multivariate"
@@ -69,6 +86,7 @@ dftv = t0.ix[np.logical_and(t0.day.values >= 21, t0.day.values < 32), ['click', 
 dftv['app_site_model'] = np.add(dftv.device_model.values, dftv.app_site_id.values)
 dftv['app_site_model_aw'] = np.add(dftv.app_site_model.values, dftv.app_or_web.astype('string').values)
 dftv['dev_ip_app_site'] = np.add(dftv.device_ip.values, dftv.app_site_id.values)
+#初始化
 for vn in vns:
     dftv[vn] = dftv[vn].astype('category')
     print vn
@@ -77,16 +95,21 @@ n_ks = {'app_or_web': 100, 'app_site_id': 100, 'device_ip': 10, 'C14': 50, 'app_
         'C17': 100, 'C21': 100, 'C1': 100, 'device_type': 100, 'device_conn_type': 100, 'banner_pos': 100,
         'app_site_model_aw': 100, 'dev_ip_app_site': 10 , 'device_model': 500}
 
+#每个特征转化后的向量
 exp2_dict = {}
 for vn in vns:
     exp2_dict[vn] = np.zeros(dftv.shape[0])
 
+#所有"day"这一列
 days_npa = dftv.day.values
     
 for day_v in xrange(22, 32):
+    #第[:day_v)天
     df1 = dftv.ix[np.logical_and(dftv.day.values < day_v, dftv.day.values < 31), :].copy()
+    #第[day_v:day_v+1)天
     df2 = dftv.ix[dftv.day.values == day_v, :]
     print "Validation day:", day_v, ", train data shape:", df1.shape, ", validation data shape:", df2.shape
+    #以均值初始化 [:day_v)    
     pred_prev = df1.click.values.mean() * np.ones(df1.shape[0])
     for vn in vns:
         if 'exp2_'+vn in df1.columns:
